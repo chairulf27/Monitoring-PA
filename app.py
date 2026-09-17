@@ -4,6 +4,8 @@ import sqlite3
 import os
 import io
 from datetime import date
+import datetime                  # <--- Tambahan baru
+from docxtpl import DocxTemplate # <--- Tambahan baru
 
 # Konfigurasi Halaman Minimalis & Elegan
 st.set_page_config(page_title="Portal Aktivasi", layout="wide", initial_sidebar_state="expanded")
@@ -539,74 +541,87 @@ elif menu == "🧵 3. Penarikan Kabel":
 # HALAMAN: 4. GENERATE PRECONFIG
 # ==========================================
 elif menu == "⚙️ 4. Generate Preconfig":
-    st.title("Generate Preconfig Switch")
-    st.info("Fitur Generate Preconfig tersedia di aplikasi Standalone.")
-    df_project = load_data_project()
-    if not df_project.empty:
-        dict_project = {f"{row['id_project']} - {row['pelanggan']}": row['id_project'] for idx, row in df_project.iterrows()}
-        pilih_id = dict_project[st.selectbox("Pilih Project", list(dict_project.keys()))]
-        if st.button("Lanjutkan Tiket ke Tahap Validasi BAI", use_container_width=True):
-            update_status_preconfig(pilih_id)
-            st.success("✅ Status tiket dipindahkan ke Menu 5.")
+    st.title("⚙️ Generate Preconfig & Update Tiket")
+    
+    # Membuat 2 Tab Bersebelahan
+    tab_preconfig, tab_update4 = st.tabs(["🛠️ Alat Generator Preconfig", "➡️ Update Status Tiket"])
+
+    with tab_preconfig:
+        st.write("Silakan generate script Preconfig di bawah ini:")
+        # ----------------------------------------------------
+        # MAS CHAIRUL, PASTE KODE APLIKASI PRECONFIG DI SINI
+        # Pastikan indentasinya (spasi ke dalam) sejajar ya!
+        # ----------------------------------------------------
+
+    with tab_update4:
+        st.subheader("Lanjutkan Tiket ke Tahap Selanjutnya")
+        df_project = load_data_project()
+        if not df_project.empty:
+            dict_project = {f"{row['id_project']} - {row['pelanggan']}": row['id_project'] for idx, row in df_project.iterrows()}
+            pilih_id = dict_project[st.selectbox("Pilih Project", list(dict_project.keys()), key="proj_preconfig")]
+            if st.button("Lanjutkan Tiket ke Tahap Validasi BAI", use_container_width=True):
+                update_status_preconfig(pilih_id)
+                st.success("✅ Status tiket dipindahkan ke Menu 5.")
 
 # ==========================================
-# HALAMAN: 5. STATUS PENYELESAIAN (BAI) DENGAN SMART SEARCH
+# HALAMAN: 5. STATUS PENYELESAIAN (BAI)
 # ==========================================
 elif menu == "📁 5. Status Penyelesaian (BAI)":
-    st.title("Validasi & Pencarian Tiket BAI")
-    st.markdown("Cari tiket berdasarkan ID atau Nama Pelanggan untuk memproses penyelesaian.")
+    st.title("📁 Validasi & Pembuatan Dokumen BAI")
     
-    df_project = load_data_project()
-    
-    # FILTER BARU: Saring hanya project yang BELUM SELESAI
-    df_pending = df_project[df_project['status_akhir'] != 'Selesai']
-    
-    if df_pending.empty:
-        st.success("🎉 Luar biasa! Saat ini tidak ada tiket yang menggantung. Semua project sudah selesai atau belum ada data baru.")
-    else:
-        # --- FITUR SMART SEARCH SEBELUM MEMILIH TIKET ---
-        search_query = st.text_input("🔎 Cari Tiket (Ketik ID atau Nama Pelanggan)", placeholder="Contoh: A821... atau Indomarco")
-        
-        # Filter daftar project berdasarkan input search dari df_pending
-        list_all = [f"{row['id_project']} - {row['pelanggan']}" for _, row in df_pending.iterrows()]
-        if search_query:
-            list_filtered = [item for item in list_all if search_query.lower() in item.lower()]
-        else:
-            list_filtered = list_all
+    # Membuat 2 Tab Bersebelahan
+    tab_bai, tab_update5 = st.tabs(["📝 Alat Generator BAI", "✅ Tutup Tiket Project"])
 
-        if not list_filtered:
-            st.warning("⚠️ Tiket tidak ditemukan di daftar On Progress. Coba kata kunci lain atau pastikan tiket belum berstatus Selesai.")
+    with tab_bai:
+        st.write("Silakan generate dokumen Berita Acara Instalasi di bawah ini:")
+        # ----------------------------------------------------
+        # MAS CHAIRUL, PASTE SELURUH KODE GENERATOR BAI (Fungsi terbilang, 
+        # opsi individu/terlampir, dll) DI SINI.
+        # Pastikan indentasinya (spasi ke dalam) sejajar ya!
+        # ----------------------------------------------------
+
+    with tab_update5:
+        st.subheader("Validasi & Pencarian Tiket BAI")
+        st.markdown("Cari tiket berdasarkan ID atau Nama Pelanggan untuk memproses penyelesaian.")
+        
+        df_project = load_data_project()
+        df_pending = df_project[df_project['status_akhir'] != 'Selesai']
+        
+        if df_pending.empty:
+            st.success("🎉 Luar biasa! Saat ini tidak ada tiket yang menggantung.")
         else:
-            # User memilih dari daftar yang sudah tersaring
-            pilih_str = st.selectbox(f"Ditemukan {len(list_filtered)} Tiket On Progress. Silakan pilih:", list_filtered)
-            pilih_id = pilih_str.split(" - ")[0]
-            data_terpilih = df_pending[df_pending['id_project'] == pilih_id].iloc[0]
-            
-            st.info(f"📍 **Alamat:** {data_terpilih['alamat']} | 🏢 **Mitra:** {data_terpilih['rekanan']} | 📌 **Status:** {data_terpilih['status_akhir']}")
-            
-            status_pekerjaan = st.radio(
-                "Apakah dokumen BAI sudah ditandatangani dan pekerjaan selesai?", 
-                ["Pilih Status...", "✅ Sudah Selesai (On-Air & BAI)", "⚠️ Belum Selesai (Ada Kendala)"],
-                horizontal=True
-            )
-            
-            st.markdown("---")
-            
-            if status_pekerjaan == "✅ Sudah Selesai (On-Air & BAI)":
-                tgl_selesai = st.date_input("📅 Pilih Tanggal Selesai (Sesuai Dokumen BAI)", value=date.today())
-                if st.button("Simpan & Selesaikan Project", use_container_width=True):
-                    update_status_bai(pilih_id, 'Selesai', tgl_selesai, '-')
-                    st.balloons()
-                    st.success(f"✅ Hebat! Project {pilih_id} berhasil diselesaikan pada tanggal {tgl_selesai}. Status tiket berubah menjadi 'Selesai'!")
-                    
-            elif status_pekerjaan == "⚠️ Belum Selesai (Ada Kendala)":
-                val_kendala = data_terpilih.get('kendala_bai', '-')
-                kendala = st.text_area("Jelaskan Kendala (Contoh: Pelanggan sedang ke luar kota, belum bisa TTD)", 
-                                       value=val_kendala if val_kendala != '-' else "", height=100)
-                if st.button("Simpan Kendala", use_container_width=True):
-                    if kendala.strip() == "":
-                        st.error("⚠️ Harap isi kolom kendala terlebih dahulu!")
-                    else:
-                        update_status_bai(pilih_id, 'Kendala', '-', kendala)
-                        st.warning(f"⚠️ Kendala untuk project {pilih_id} berhasil disimpan! Status tiket berubah menjadi 'Kendala BAI'.")
-                        st.rerun()
+            search_query = st.text_input("🔎 Cari Tiket (Ketik ID atau Nama Pelanggan)", placeholder="Contoh: A821... atau Indomarco")
+            list_all = [f"{row['id_project']} - {row['pelanggan']}" for _, row in df_pending.iterrows()]
+            list_filtered = [item for item in list_all if search_query.lower() in item.lower()] if search_query else list_all
+
+            if not list_filtered:
+                st.warning("⚠️ Tiket tidak ditemukan di daftar On Progress.")
+            else:
+                pilih_str = st.selectbox(f"Ditemukan {len(list_filtered)} Tiket. Silakan pilih:", list_filtered)
+                pilih_id = pilih_str.split(" - ")[0]
+                data_terpilih = df_pending[df_pending['id_project'] == pilih_id].iloc[0]
+                
+                st.info(f"📍 **Alamat:** {data_terpilih['alamat']} | 🏢 **Mitra:** {data_terpilih['rekanan']} | 📌 **Status:** {data_terpilih['status_akhir']}")
+                
+                status_pekerjaan = st.radio(
+                    "Apakah dokumen BAI sudah ditandatangani dan pekerjaan selesai?", 
+                    ["Pilih Status...", "✅ Sudah Selesai (On-Air & BAI)", "⚠️ Belum Selesai (Ada Kendala)"], horizontal=True
+                )
+                st.markdown("---")
+                if status_pekerjaan == "✅ Sudah Selesai (On-Air & BAI)":
+                    tgl_selesai = st.date_input("📅 Pilih Tanggal Selesai", value=date.today())
+                    if st.button("Simpan & Selesaikan Project", use_container_width=True):
+                        update_status_bai(pilih_id, 'Selesai', tgl_selesai, '-')
+                        st.balloons()
+                        st.success(f"✅ Project {pilih_id} berhasil diselesaikan pada {tgl_selesai}!")
+                        
+                elif status_pekerjaan == "⚠️ Belum Selesai (Ada Kendala)":
+                    val_kendala = data_terpilih.get('kendala_bai', '-')
+                    kendala = st.text_area("Jelaskan Kendala", value=val_kendala if val_kendala != '-' else "", height=100)
+                    if st.button("Simpan Kendala", use_container_width=True):
+                        if kendala.strip() == "":
+                            st.error("⚠️ Harap isi kolom kendala terlebih dahulu!")
+                        else:
+                            update_status_bai(pilih_id, 'Kendala', '-', kendala)
+                            st.warning(f"⚠️ Kendala untuk project {pilih_id} berhasil disimpan!")
+                            st.rerun()
